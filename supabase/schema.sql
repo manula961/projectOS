@@ -1,6 +1,6 @@
 create extension if not exists pgcrypto;
 create table if not exists public.profiles(id uuid primary key references auth.users(id) on delete cascade, display_name text, avatar_url text, bio text, github_username text, created_at timestamptz default now(), updated_at timestamptz default now());
-create table if not exists public.projects(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,name text not null,slug text not null,short_description text,full_description text,cover_url text,category text,status text not null default 'idea' check(status in('idea','planning','development','testing','deployed','completed','paused','archived')),priority text not null default 'medium' check(priority in('low','medium','high')),progress int not null default 0 check(progress between 0 and 100),github_url text,live_url text,docs_url text,api_url text,hosting_provider text,visibility text not null default 'private' check(visibility in('private','unlisted','public')),featured boolean not null default false,start_date date,target_date date,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,slug));
+create table if not exists public.projects(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,name text not null,slug text not null,short_description text,full_description text,cover_url text,category text,status text not null default 'idea' check(status in('idea','development','deployed','completed')),priority text not null default 'medium' check(priority in('low','medium','high')),progress int not null default 0 check(progress between 0 and 100),github_url text,live_url text,docs_url text,api_url text,hosting_provider text,visibility text not null default 'private' check(visibility in('private','unlisted','public')),featured boolean not null default false,start_date date,target_date date,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,slug));
 create table if not exists public.tags(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,name text not null,color text,unique(user_id,name));
 create table if not exists public.project_tags(project_id uuid references public.projects(id) on delete cascade,tag_id uuid references public.tags(id) on delete cascade,user_id uuid not null references auth.users(id) on delete cascade,primary key(project_id,tag_id));
 create table if not exists public.technologies(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,name text not null,category text,unique(user_id,name));
@@ -37,3 +37,49 @@ create policy "project_files_storage_update" on storage.objects for update using
 create policy "project_files_storage_delete" on storage.objects for delete using(bucket_id='project-files' and auth.uid()::text=(storage.foldername(name))[1]);
 
 create index if not exists projects_user_updated_idx on public.projects(user_id,updated_at desc); create index if not exists tasks_user_status_idx on public.project_tasks(user_id,status); create index if not exists updates_project_idx on public.project_updates(project_id,created_at desc); create index if not exists activity_user_created_idx on public.activity_logs(user_id,created_at desc);
+
+-- GitHub timeline synchronization
+alter table public.projects add column if not exists github_synced_at timestamptz;
+alter table public.project_updates add column if not exists source text not null default 'manual';
+alter table public.project_updates add column if not exists external_id text;
+alter table public.project_updates add column if not exists external_url text;
+alter table public.project_updates add column if not exists author_name text;
+alter table public.project_updates add column if not exists commit_sha text;
+create unique index if not exists project_updates_external_unique on public.project_updates(project_id, external_id);
+create index if not exists projects_github_url_idx on public.projects(user_id, github_url) where github_url is not null;
+
+
+-- ProjectOS final feature migration
+alter table public.projects add column if not exists architecture_notes text;
+alter table public.projects add column if not exists setup_notes text;
+alter table public.projects add column if not exists environment_notes text;
+
+create table if not exists public.project_deployments(
+ id uuid primary key default gen_random_uuid(),
+ project_id uuid not null references public.projects(id) on delete cascade,
+ user_id uuid not null references auth.users(id) on delete cascade,
+ provider text not null default 'other',
+ environment text not null default 'production',
+ status text not null default 'unknown' check(status in('ready','building','failed','unknown')),
+ url text,
+ version text,
+ deployed_at timestamptz default now(),
+ created_at timestamptz not null default now()
+);
+create table if not exists public.project_secret_refs(
+ id uuid primary key default gen_random_uuid(),
+ project_id uuid not null references public.projects(id) on delete cascade,
+ user_id uuid not null references auth.users(id) on delete cascade,
+ name text not null,
+ location text not null,
+ notes text,
+ created_at timestamptz not null default now(),
+ unique(project_id,name)
+);
+alter table public.project_deployments enable row level security;
+alter table public.project_secret_refs enable row level security;
+drop policy if exists own_all_project_deployments on public.project_deployments;
+create policy own_all_project_deployments on public.project_deployments for all using(auth.uid()=user_id) with check(auth.uid()=user_id);
+drop policy if exists own_all_project_secret_refs on public.project_secret_refs;
+create policy own_all_project_secret_refs on public.project_secret_refs for all using(auth.uid()=user_id) with check(auth.uid()=user_id);
+create index if not exists deployments_project_date_idx on public.project_deployments(project_id,deployed_at desc);

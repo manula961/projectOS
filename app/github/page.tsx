@@ -1,0 +1,1 @@
+import AppShell from '@/components/AppShell';import GitHubCenter from '@/components/GitHubCenter';export default function GitHub(){return <AppShell title="GitHub Sync Center" subtitle="Repository activity and engineering health"><GitHubCenter/></AppShell>}

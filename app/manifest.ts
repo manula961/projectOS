@@ -1,0 +1,1 @@
+import type {MetadataRoute} from 'next';export default function manifest():MetadataRoute.Manifest{return {name:'ProjectOS',short_name:'ProjectOS',description:'Personal developer project command center',start_url:'/dashboard',display:'standalone',background_color:'#090b10',theme_color:'#090b10',icons:[]}}

@@ -1,7 +1,60 @@
 'use client';
-import {useState} from 'react'; import {createClient} from '@/lib/supabase/client'; import {LockKeyhole, Github} from 'lucide-react';
-export default function LoginForm(){const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [mode,setMode]=useState<'login'|'signup'>('login');const [msg,setMsg]=useState('');const s=createClient();
-async function submit(e:React.FormEvent){e.preventDefault();setMsg('');const r=mode==='login'?await s.auth.signInWithPassword({email,password}):await s.auth.signUp({email,password});if(r.error)setMsg(r.error.message);else if(mode==='signup')setMsg('Account created. Check your email if confirmation is enabled.');else location.href='/dashboard'}
-async function google(){await s.auth.signInWithOAuth({provider:'google',options:{redirectTo:`${location.origin}/auth/callback`}})}
-async function github(){await s.auth.signInWithOAuth({provider:'github',options:{redirectTo:`${location.origin}/auth/callback`}})}
-return <div className="auth-card"><div className="auth-logo"><LockKeyhole/> ProjectOS</div><h1>Your private project command center</h1><p>Manage projects, files, tasks, releases and milestones from one secure dashboard.</p><form onSubmit={submit}><label>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="primary" type="submit">{mode==='login'?'Sign in':'Create account'}</button></form><div className="or">or</div><button className="social" onClick={google}>Continue with Google</button><button className="social" onClick={github}><Github size={18}/> Continue with GitHub</button>{msg&&<div className="notice">{msg}</div>}<button className="linkbtn" onClick={()=>setMode(mode==='login'?'signup':'login')}>{mode==='login'?'Need an account? Sign up':'Already registered? Sign in'}</button></div>}
+
+import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+
+export default function LoginForm() {
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [message,setMessage]=useState('');
+  const [loading,setLoading]=useState(false);
+  const supabase=createClient();
+
+  async function submit(event:React.FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(loading)return;
+    setLoading(true);setMessage('');
+    const {error}=await supabase.auth.signInWithPassword({email,password});
+    if(error){setMessage('Invalid email or password.');setLoading(false);return}
+    try{
+      const response=await fetch('/api/auth/authorize',{method:'GET',cache:'no-store'});
+      if(!response.ok){
+        await supabase.auth.signOut();
+        const body=await response.json().catch(()=>null);
+        setMessage(body?.message||'This account is not authorized to access ProjectOS.');
+        setLoading(false);return
+      }
+      window.location.assign('/dashboard');
+    }catch{
+      await supabase.auth.signOut();
+      setMessage('Could not verify access. Please try again.');
+      setLoading(false)
+    }
+  }
+
+  return <div className="login-shell">
+    <section className="login-intro">
+      <div className="login-brand"><span><Sparkles size={18}/></span>ProjectOS</div>
+      <div className="login-copy">
+        <span className="hero-badge"><ShieldCheck size={14}/> Private workspace</span>
+        <h1>Everything you build.<br/>One quiet place.</h1>
+        <p>Your personal project database, GitHub activity, deployments, files and technical context — protected behind a single owner account.</p>
+      </div>
+      <div className="login-foot">Single-user mode · Supabase Auth · Row Level Security</div>
+    </section>
+
+    <section className="login-panel">
+      <div className="auth-card">
+        <div className="auth-symbol"><LockKeyhole/></div>
+        <div><span className="section-kicker">OWNER ACCESS</span><h2>Welcome back</h2><p>Use your ProjectOS administrator account.</p></div>
+        <form onSubmit={submit}>
+          <label>Email address<input type="email" autoComplete="email" placeholder="you@example.com" required value={email} onChange={e=>setEmail(e.target.value)} disabled={loading}/></label>
+          <label>Password<input type="password" autoComplete="current-password" placeholder="••••••••" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} disabled={loading}/></label>
+          <button className="primary auth-submit" type="submit" disabled={loading}>{loading?'Verifying…':<>Enter workspace <ArrowRight size={16}/></>}</button>
+        </form>
+        {message&&<div className="notice error" role="alert">{message}</div>}
+      </div>
+    </section>
+  </div>
+}
