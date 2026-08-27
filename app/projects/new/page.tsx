@@ -1,0 +1,1 @@
+import AppShell from '@/components/AppShell';import ProjectForm from '@/components/ProjectForm';export default function NewProject(){return <AppShell title="New project" subtitle="Add a project to your database"><ProjectForm/></AppShell>}
