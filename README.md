@@ -111,3 +111,19 @@ The interface has been fully rebuilt around a compact developer-command-center d
 - Analytics, Tasks and Backup remain removed
 
 No database migration is required solely for this UI remodel.
+
+
+## UI Fix v4.1
+
+This pass fixes the production UI issues visible in the GitHub Sync Center and Project detail workspace:
+- GitHub cards no longer overflow or wrap the Open Project action incorrectly
+- Repository metadata, metrics, tags, dependencies and README previews use bounded responsive layouts
+- Project detail hero has compact GitHub / Live / Delete actions instead of the oversized delete region
+- Long project names, repository names, paths and URLs safely truncate or wrap
+- Project overview uses a balanced responsive grid
+- Tabs remain horizontally usable at narrow widths
+- Mobile GitHub and project layouts reflow cleanly
+- Removed the CSS `align-items: end` compatibility warning by using `flex-end`
+- Existing authentication, GitHub sync/import, project CRUD and database functionality are unchanged
+
+No Supabase migration is required for this UI-only update.
